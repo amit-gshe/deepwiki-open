@@ -81,7 +81,7 @@ async def handle_websocket_chat(websocket: WebSocket):
                 logger.info(f"Request size: {tokens} tokens")
                 if tokens > 8000:
                     logger.warning(f"Request exceeds recommended token limit ({tokens} > 7500)")
-                    input_too_large = True
+                    # input_too_large = True
 
         # Create a new RAG instance for this request
         try:
@@ -358,7 +358,7 @@ IMPORTANT:You MUST respond in {language_name} language.
         else:
             system_prompt = f"""<role>
 You are an expert code analyst examining the {repo_type} repository: {repo_url} ({repo_name}).
-You provide direct, concise, and accurate information about code repositories.
+You provide direct and accurate information about code repositories.
 You NEVER start responses with markdown headers or code fences.
 IMPORTANT:You MUST respond in {language_name} language.
 </role>
@@ -415,7 +415,7 @@ This file contains...
                 conversation_history += f"<turn>\n<user>{turn.user_query.query_str}</user>\n<assistant>{turn.assistant_response.response_str}</assistant>\n</turn>\n"
 
         # Create the prompt with context
-        prompt = f"/no_think {system_prompt}\n\n"
+        prompt = f"{system_prompt}\n\n"
 
         if conversation_history:
             prompt += f"<conversation_history>\n{conversation_history}</conversation_history>\n\n"
@@ -435,13 +435,13 @@ This file contains...
             logger.info("No context available from RAG")
             prompt += "<note>Answering without retrieval augmentation.</note>\n\n"
 
-        prompt += f"<query>\n{query}\n</query>\n\nAssistant: "
+        prompt += f"<query>\n{query}\n</query>\n\n"
 
         model_config = get_model_config(request.provider, request.model)["model_kwargs"]
 
         if request.provider == "ollama":
-            prompt += " /no_think"
-
+            # prompt += " /no_think"
+            logger.info(f"Prompt: {prompt}")
             model = OllamaClient()
             model_kwargs = {
                 "model": model_config["model"],
@@ -578,28 +578,21 @@ This file contains...
                 response = await model.acall(api_kwargs=api_kwargs, model_type=ModelType.LLM)
                 # Handle streaming response from Ollama
                 async for chunk in response:
-                    text = None
-                    if isinstance(chunk, dict):
-                        text = chunk.get("message", {}).get("content") if isinstance(chunk.get("message"), dict) else chunk.get("message")
-                    else:
-                        message = getattr(chunk, "message", None)
-                        if message is not None:
-                            if isinstance(message, dict):
-                                text = message.get("content")
-                            else:
-                                text = getattr(message, "content", None)
 
-                    if not text:
-                        text = getattr(chunk, 'response', None) or getattr(chunk, 'text', None)
+                    # chat response since ollama v0.1.14: https://github.com/ollama/ollama/blob/v0.1.14/server/routes.go#L1001
+                    message = getattr(chunk, 'message', None)
+                    if message:
+                        text = getattr(message, 'content', None)
+                        if text:
+                            text = text.replace('<think>', '').replace('</think>', '')
+                            await websocket.send_text(text)
+                            continue
 
-                    if not text and hasattr(chunk, "__dict__"):
-                        message = chunk.__dict__.get("message")
-                        if isinstance(message, dict):
-                            text = message.get("content")
-
-                    if isinstance(text, str) and text and not text.startswith('model=') and not text.startswith('created_at='):
-                        clean_text = text.replace('<think>', '').replace('</think>', '')
-                        await websocket.send_text(clean_text)
+                    # backwards compatibility
+                    text = getattr(chunk, 'response', None) or getattr(chunk, 'text', None) or str(chunk)
+                    if text and not text.startswith('model=') and not text.startswith('created_at='):
+                        text = text.replace('<think>', '').replace('</think>', '')
+                        await websocket.send_text(text)
                 # Explicitly close the WebSocket connection after the response is complete
                 await websocket.close()
             elif request.provider == "openrouter":

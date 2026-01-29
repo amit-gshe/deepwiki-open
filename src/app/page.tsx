@@ -75,7 +75,7 @@ export default function Home() {
     return key;
   };
 
-  const [repositoryInput, setRepositoryInput] = useState('https://github.com/AsyncFuncAI/deepwiki-open');
+  const [repositoryInput, setRepositoryInput] = useState('');
 
   const REPO_CONFIG_CACHE_KEY = 'deepwikiRepoConfigCache';
 
@@ -122,13 +122,13 @@ export default function Home() {
   }, []);
 
   // Provider-based model selection state
-  const [provider, setProvider] = useState<string>('');
-  const [model, setModel] = useState<string>('');
+  const [provider, setProvider] = useState<string>('ollama');
+  const [model, setModel] = useState<string>('qwen3:8b');
   const [isCustomModel, setIsCustomModel] = useState<boolean>(false);
   const [customModel, setCustomModel] = useState<string>('');
 
   // Wiki type state - default to comprehensive view
-  const [isComprehensiveView, setIsComprehensiveView] = useState<boolean>(true);
+  const [isComprehensiveView, setIsComprehensiveView] = useState<boolean>(false);
 
   const [excludedDirs, setExcludedDirs] = useState('');
   const [excludedFiles, setExcludedFiles] = useState('');
@@ -189,6 +189,8 @@ export default function Home() {
     // Handle Windows absolute paths (e.g., C:\path\to\folder)
     const windowsPathRegex = /^[a-zA-Z]:\\(?:[^\\/:*?"<>|\r\n]+\\)*[^\\/:*?"<>|\r\n]*$/;
     const customGitRegex = /^(?:https?:\/\/)?([^\/]+)\/(.+?)\/([^\/]+)(?:\.git)?\/?$/;
+    // 处理SSH协议 (git@domain:owner/repo.git)  
+    const sshRegex = /^(?:git@|ssh:\/\/git@)([^:]+):(.+?)\/([^\/]+)(?:\.git)?\/?$/;  
 
     if (windowsPathRegex.test(input)) {
       type = 'local';
@@ -203,7 +205,7 @@ export default function Home() {
       repo = input.split('/').filter(Boolean).pop() || 'local-repo';
       owner = 'local';
     }
-    else if (customGitRegex.test(input)) {
+    else if (customGitRegex.test(input) || sshRegex.test(input)) {
       // Detect repository type based on domain
       const domain = extractUrlDomain(input);
       if (domain?.includes('github.com')) {
@@ -241,7 +243,7 @@ export default function Home() {
     if (repo.endsWith('.git')) {
       repo = repo.slice(0, -4);
     }
-
+    console.log('Parsed Repository:', owner, repo, type, fullPath, localPath);
     return { owner, repo, type, fullPath, localPath };
   };
 
@@ -349,7 +351,7 @@ export default function Home() {
       params.append('token', accessToken);
     }
     // Always include the type parameter
-    params.append('type', (type == 'local' ? type : selectedPlatform) || 'github');
+    params.append('type', ((type == 'local' || type == 'web') ? type : selectedPlatform) || 'github');
     // Add local path if it exists
     if (localPath) {
       params.append('local_path', encodeURIComponent(localPath));

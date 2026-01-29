@@ -4,7 +4,7 @@
  */
 
 // Get the server base URL from environment or use default
-const SERVER_BASE_URL = process.env.SERVER_BASE_URL || 'http://localhost:8001';
+const SERVER_BASE_URL = process.env.SERVER_BASE_URL || 'http://172.16.2.78:8001';
 
 // Convert HTTP URL to WebSocket URL
 const getWebSocketUrl = () => {
