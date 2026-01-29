@@ -287,8 +287,10 @@ def read_all_documents(path: str, embedder_type: str = None, is_ollama_embedder:
 
             # Check if file is in an excluded directory
             for excluded in excluded_dirs:
-                clean_excluded = excluded.strip("./").rstrip("/")
+                clean_excluded = excluded.removeprefix("./").removesuffix("/")
                 if clean_excluded in file_path_parts:
+                    if "node_modules" not in file_path:
+                        logger.info(f"excluded in excluded_dirs: {excluded} {file_path_parts} {clean_excluded}")
                     is_excluded = True
                     break
 
@@ -297,6 +299,8 @@ def read_all_documents(path: str, embedder_type: str = None, is_ollama_embedder:
                 for excluded_file in excluded_files:
                     if file_name == excluded_file:
                         is_excluded = True
+                        if "node_modules" not in file_path:
+                            logger.info(f"excluded_file in excluded_files: {excluded_file}")
                         break
 
             return not is_excluded
@@ -306,14 +310,21 @@ def read_all_documents(path: str, embedder_type: str = None, is_ollama_embedder:
         files = glob.glob(f"{path}/**/*{ext}", recursive=True)
         for file_path in files:
             # Check if file should be processed based on inclusion/exclusion rules
+            if "node_modules" not in file_path:
+                logger.info(f"Begin reading {file_path}")
             if not should_process_file(file_path, use_inclusion_mode, included_dirs, included_files, excluded_dirs, excluded_files):
+                if "node_modules" not in file_path:
+                    logger.info(f"Skipping {file_path}")
                 continue
 
             try:
                 with open(file_path, "r", encoding="utf-8") as f:
                     content = f.read()
                     relative_path = os.path.relpath(file_path, path)
-
+                    
+                    # 预处理内容  
+                    file_ext = os.path.splitext(relative_path)[1]  
+                    processed_content = preprocess_document_content(content, file_ext)  
                     # Determine if this is an implementation file
                     is_implementation = (
                         not relative_path.startswith("test_")
@@ -322,13 +333,13 @@ def read_all_documents(path: str, embedder_type: str = None, is_ollama_embedder:
                     )
 
                     # Check token count
-                    token_count = count_tokens(content, embedder_type)
+                    token_count = count_tokens(processed_content, embedder_type)
                     if token_count > MAX_EMBEDDING_TOKENS * 10:
                         logger.warning(f"Skipping large file {relative_path}: Token count ({token_count}) exceeds limit")
                         continue
 
                     doc = Document(
-                        text=content,
+                        text=processed_content,
                         meta_data={
                             "file_path": relative_path,
                             "type": ext[1:],
@@ -378,6 +389,58 @@ def read_all_documents(path: str, embedder_type: str = None, is_ollama_embedder:
 
     logger.info(f"Found {len(documents)} documents")
     return documents
+
+def preprocess_document_content(content: str, file_extension: str) -> str:  
+    """  
+    根据文件扩展名预处理文档内容  
+      
+    Args:  
+        content: 原始文件内容  
+        file_extension: 文件扩展名（如 '.java', '.py'）  
+      
+    Returns:  
+        预处理后的内容  
+    """  
+    if file_extension == '.java':  
+        return _preprocess_java(content)  
+    elif file_extension == '.py':  
+        return _preprocess_python(content)
+    else:  
+        return content  
+  
+def _preprocess_java(content: str) -> str:  
+    """Java文件预处理：去掉import和package语句"""  
+    lines = content.split('\n')  
+    filtered_lines = []  
+      
+    for line in lines:  
+        stripped = line.strip()  
+        # 跳过import和package语句  
+        if not (stripped.startswith('import ')):  
+            filtered_lines.append(line)  
+      
+    return '\n'.join(filtered_lines)  
+  
+def _preprocess_python(content: str) -> str:  
+    """Python文件预处理：可根据需要添加逻辑"""  
+    # 示例：去掉if __name__ == "__main__"块  
+    lines = content.split('\n')  
+    filtered_lines = []  
+    skip_main = False  
+      
+    for line in lines:  
+        if 'if __name__ == "__main__"' in line:  
+            skip_main = True  
+            continue  
+        if skip_main and line.strip().startswith('    ') and not line.strip().startswith('    #'):  
+            continue  
+        if skip_main and not line.strip().startswith('    '):  
+            skip_main = False  
+          
+        if not skip_main:  
+            filtered_lines.append(line)  
+      
+    return '\n'.join(filtered_lines)
 
 def prepare_data_pipeline(embedder_type: str = None, is_ollama_embedder: bool = None):
     """
