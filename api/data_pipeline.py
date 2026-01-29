@@ -859,7 +859,7 @@ class DatabaseManager:
 
             os.makedirs(root_path, exist_ok=True)
             # url
-            if repo_url_or_path.startswith("https://") or repo_url_or_path.startswith("http://"):
+            if repo_url_or_path.startswith("https://") or repo_url_or_path.startswith("http://") or repo_url_or_path.startswith("git@"):
                 # Extract the repository name from the URL
                 repo_name = self._extract_repo_name_from_url(repo_url_or_path, repo_type)
                 logger.info(f"Extracted repo name: {repo_name}")
