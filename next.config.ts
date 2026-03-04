@@ -9,6 +9,9 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ['@mermaid-js/mermaid', 'react-syntax-highlighter'],
   },
+  env: {
+    SERVER_BASE_URL: TARGET_SERVER_BASE_URL,
+  },
   // Reduce memory usage during build
   webpack: (config, { isServer }) => {
     if (!isServer) {
