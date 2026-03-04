@@ -470,6 +470,11 @@ const Ask: React.FC<AskProps> = ({
       } else {
         setResearchComplete(isComplete);
       }
+      // Add assistant response to conversation history  
+      setConversationHistory(prev => [...prev, {  
+        role: 'assistant',  
+        content: fullResponse  
+      }]);  
     } catch (error) {
       console.error('Error during HTTP fallback:', error);
       setResponse(prev => prev + '\n\nError: Failed to get a response. Please try again.');
@@ -552,7 +557,7 @@ const Ask: React.FC<AskProps> = ({
       };
 
       // Set initial conversation history
-      const newHistory: Message[] = [initialMessage];
+      const newHistory: Message[] = [...conversationHistory, initialMessage];
       setConversationHistory(newHistory);
 
       // Prepare request body
@@ -603,6 +608,11 @@ const Ask: React.FC<AskProps> = ({
         },
         // Close handler
         () => {
+          // Add assistant response to conversation history  
+          setConversationHistory(prev => [...prev, {  
+            role: 'assistant',  
+            content: fullResponse  
+          }]); 
           // If deep research is enabled, check if we should continue
           if (deepResearch) {
             const isComplete = checkIfResearchComplete(fullResponse);
@@ -639,23 +649,103 @@ const Ask: React.FC<AskProps> = ({
 
   return (
     <div>
-      <div className="p-4">
-        <div className="flex items-center justify-end mb-4">
-          {/* Model selection button */}
-          <button
-            type="button"
-            onClick={() => setIsModelSelectionModalOpen(true)}
-            className="text-xs px-2.5 py-1 rounded border border-[var(--border-color)]/40 bg-[var(--background)]/10 text-[var(--foreground)]/80 hover:bg-[var(--background)]/30 hover:text-[var(--foreground)] transition-colors flex items-center gap-1.5"
-          >
-            <span>{selectedProvider}/{isCustomSelectedModel ? customSelectedModel : selectedModel}</span>
-            <svg className="h-3.5 w-3.5 text-[var(--accent-primary)]/70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
-          </button>
-        </div>
+      <div className="h-full flex flex-col">
+        {/* Response area */}
+        {(response || conversationHistory.length > 0) && (
+          <div className="border-gray-200 dark:border-gray-700 mt-4">
+            <div
+              ref={responseRef}
+              className="p-4 overflow-y-auto"
+            >
+              {/* Render full conversation history */}  
+              {conversationHistory.map((message, index) => (  
+                <div key={index} className={`mb-2 ${message.role === 'user' ? 'text-right' : 'text-left'}`}>  
+                  <div className={`inline-block max-w-[95%] p-1 rounded-lg ${  
+                    message.role === 'user'   
+                      ? 'bg-blue-500 text-white'   
+                      : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'  
+                  }`}>  
+                    <div className="text-xs font-semibold mb-1 opacity-70">  
+                      {message.role === 'user' ? 'You' : 'Assistant'}  
+                    </div>  
+                    <Markdown content={message.content} />  
+                  </div>  
+                </div>  
+              ))}  
+                
+              {/* Show current streaming response if it's not yet in history */}  
+              {response && (!conversationHistory.length ||   
+                conversationHistory[conversationHistory.length - 1]?.content !== response) && (  
+                <div className="mb-4 text-left">  
+                  <div className="inline-block max-w-[95%] p-3 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100">  
+                    <div className="text-xs font-semibold mb-1 opacity-70">Assistant</div>  
+                    <Markdown content={response} />  
+                  </div>  
+                </div>  
+              )} 
+            </div>
+
+            {/* Research navigation and clear button */}
+            <div className="p-2 flex justify-between items-center border-t border-gray-200 dark:border-gray-700">
+              {/* Research navigation */}
+              {deepResearch && researchStages.length > 1 && (
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => navigateToPreviousStage()}
+                    disabled={currentStageIndex === 0}
+                    className={`p-1 rounded-md ${currentStageIndex === 0 ? 'text-gray-400 dark:text-gray-600' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'}`}
+                    aria-label="Previous stage"
+                  >
+                    <FaChevronLeft size={12} />
+                  </button>
+
+                  <div className="text-xs text-gray-600 dark:text-gray-400">
+                    {currentStageIndex + 1} / {researchStages.length}
+                  </div>
+
+                  <button
+                    onClick={() => navigateToNextStage()}
+                    disabled={currentStageIndex === researchStages.length - 1}
+                    className={`p-1 rounded-md ${currentStageIndex === researchStages.length - 1 ? 'text-gray-400 dark:text-gray-600' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'}`}
+                    aria-label="Next stage"
+                  >
+                    <FaChevronRight size={12} />
+                  </button>
+
+                  <div className="text-xs text-gray-600 dark:text-gray-400 ml-2">
+                    {researchStages[currentStageIndex]?.title || `Stage ${currentStageIndex + 1}`}
+                  </div>
+                </div>
+              )}
+
+            <div className="flex items-center space-x-2">
+              {/* Download button */}
+              <button
+                onClick={downloadresponse}
+                className="text-xs text-gray-500 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 px-2 py-1 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 flex items-center gap-1"
+                title="Download response as markdown file"
+              >
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Download
+              </button>
+
+              {/* Clear button */}
+              <button
+                id="ask-clear-conversation"
+                onClick={clearConversation}
+                className="text-xs text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 px-2 py-1 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700"
+              >
+                Clear conversation
+              </button>
+            </div>
+              </div>
+          </div>
+        )}
 
         {/* Question input */}
-        <form onSubmit={handleSubmit} className="mt-4">
+        <form onSubmit={handleSubmit} className="mt-1">
           <div className="relative">
             <input
               ref={inputRef}
@@ -728,78 +818,19 @@ const Ask: React.FC<AskProps> = ({
                 {researchComplete && ` (complete)`}
               </div>
             )}
+            {/* Model selection button */}
+          <button
+            type="button"
+            onClick={() => setIsModelSelectionModalOpen(true)}
+            className="text-xs px-2.5 py-1 rounded border border-[var(--border-color)]/40 bg-[var(--background)]/10 text-[var(--foreground)]/80 hover:bg-[var(--background)]/30 hover:text-[var(--foreground)] transition-colors flex items-center gap-1.5"
+          >
+            <span>{selectedProvider}/{isCustomSelectedModel ? customSelectedModel : selectedModel}</span>
+            <svg className="h-3.5 w-3.5 text-[var(--accent-primary)]/70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+          </button>
           </div>
         </form>
-
-        {/* Response area */}
-        {response && (
-          <div className="border-t border-gray-200 dark:border-gray-700 mt-4">
-            <div
-              ref={responseRef}
-              className="p-4 max-h-[500px] overflow-y-auto"
-            >
-              <Markdown content={response} />
-            </div>
-
-            {/* Research navigation and clear button */}
-            <div className="p-2 flex justify-between items-center border-t border-gray-200 dark:border-gray-700">
-              {/* Research navigation */}
-              {deepResearch && researchStages.length > 1 && (
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => navigateToPreviousStage()}
-                    disabled={currentStageIndex === 0}
-                    className={`p-1 rounded-md ${currentStageIndex === 0 ? 'text-gray-400 dark:text-gray-600' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'}`}
-                    aria-label="Previous stage"
-                  >
-                    <FaChevronLeft size={12} />
-                  </button>
-
-                  <div className="text-xs text-gray-600 dark:text-gray-400">
-                    {currentStageIndex + 1} / {researchStages.length}
-                  </div>
-
-                  <button
-                    onClick={() => navigateToNextStage()}
-                    disabled={currentStageIndex === researchStages.length - 1}
-                    className={`p-1 rounded-md ${currentStageIndex === researchStages.length - 1 ? 'text-gray-400 dark:text-gray-600' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'}`}
-                    aria-label="Next stage"
-                  >
-                    <FaChevronRight size={12} />
-                  </button>
-
-                  <div className="text-xs text-gray-600 dark:text-gray-400 ml-2">
-                    {researchStages[currentStageIndex]?.title || `Stage ${currentStageIndex + 1}`}
-                  </div>
-                </div>
-              )}
-
-            <div className="flex items-center space-x-2">
-              {/* Download button */}
-              <button
-                onClick={downloadresponse}
-                className="text-xs text-gray-500 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 px-2 py-1 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 flex items-center gap-1"
-                title="Download response as markdown file"
-              >
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                Download
-              </button>
-
-              {/* Clear button */}
-              <button
-                id="ask-clear-conversation"
-                onClick={clearConversation}
-                className="text-xs text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 px-2 py-1 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700"
-              >
-                Clear conversation
-              </button>
-            </div>
-              </div>
-          </div>
-        )}
-
         {/* Loading indicator */}
         {isLoading && !response && (
           <div className="p-4 border-t border-gray-200 dark:border-gray-700">
@@ -898,7 +929,6 @@ const Ask: React.FC<AskProps> = ({
           </div>
         )}
       </div>
-
       {/* Model Selection Modal */}
       <ModelSelectionModal
         isOpen={isModelSelectionModalOpen}
