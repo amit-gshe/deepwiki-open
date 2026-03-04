@@ -123,7 +123,7 @@ export default function Home() {
 
   // Provider-based model selection state
   const [provider, setProvider] = useState<string>('ollama');
-  const [model, setModel] = useState<string>('qwen3:8b');
+  const [model, setModel] = useState<string>('qwen3.5:9b');
   const [isCustomModel, setIsCustomModel] = useState<boolean>(false);
   const [customModel, setCustomModel] = useState<string>('');
 
