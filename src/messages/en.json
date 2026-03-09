@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "DeepWiki-Open",
+    "appName": "DeepWiki",
     "tagline": "AI-powered documentation",
     "generateWiki": "Generate Wiki",
     "processing": "Processing...",

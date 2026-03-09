@@ -14,7 +14,7 @@ const Markdown: React.FC<MarkdownProps> = ({ content }) => {
   // Define markdown components
   const MarkdownComponents: React.ComponentProps<typeof ReactMarkdown>['components'] = {
     p({ children, ...props }: { children?: React.ReactNode }) {
-      return <p className="mb-3 text-sm leading-relaxed dark:text-white" {...props}>{children}</p>;
+      return <p className="mb-2 text-sm leading-relaxed dark:text-white" {...props}>{children}</p>;
     },
     h1({ children, ...props }: { children?: React.ReactNode }) {
       return <h1 className="text-xl font-bold mt-6 mb-3 dark:text-white" {...props}>{children}</h1>;
@@ -193,7 +193,7 @@ const Markdown: React.FC<MarkdownProps> = ({ content }) => {
   };
 
   return (
-    <div className="prose prose-base dark:prose-invert max-w-none px-2 py-4">
+    <div className="prose prose-base dark:prose-invert max-w-none px-2">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeRaw]}
