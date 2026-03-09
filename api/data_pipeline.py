@@ -18,6 +18,8 @@ from requests.exceptions import RequestException
 
 from api.tools.embedder import get_embedder
 
+from api.java_trunk import extract_java_chunks
+
 # Configure logging
 logger = logging.getLogger(__name__)
 
@@ -323,7 +325,25 @@ def read_all_documents(path: str, embedder_type: str = None, is_ollama_embedder:
                     relative_path = os.path.relpath(file_path, path)
                     
                     # 预处理内容  
-                    file_ext = os.path.splitext(relative_path)[1]  
+                    file_ext = os.path.splitext(relative_path)[1]
+                    # java使用语法分块
+                    if file_ext in [".java"]:
+                        trunks = extract_java_chunks(file_path)
+                        for trunk in trunks:
+                            doc = Document(
+                                text=trunk.content,
+                                meta_data={
+                                    "file_path": relative_path,
+                                    "type": ext[1:],
+                                    "is_code": True,
+                                    "is_implementation": True,
+                                    "title": trunk.name,
+                                    "token_count": count_tokens(trunk.content, embedder_type),
+                                }
+                            )
+                            documents.append(doc)
+                            # print(doc)
+                        continue                      
                     processed_content = preprocess_document_content(content, file_ext)  
                     # Determine if this is an implementation file
                     is_implementation = (
